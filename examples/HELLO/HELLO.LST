@@ -1,0 +1,47 @@
+    1                   ;       HELLO - EMUZ80 HELLO, WORLD AND ECHO BACK
+    2                   ;       TARGET: EMUZ80
+    3                   ;       ASSEMBLER: ARCPIT XZ80.EXE
+    4                   ;
+    5 E000              UARTDR     EQU      0E000H      ; UART CONTROL REGISTOR
+    6 E001              UARTCR     EQU      0E001H      ; UART DATA REGISTOR
+    7 0000              ROMTOP     EQU      0000H       ; ROM TOP
+    8 8000              RAMTOP     EQU      8000H       ; RAM TOP
+    9 1000              RAMSIZ     EQU      1000H       ; RAM SIZE
+   10 9000              STACK      EQU      (RAMTOP+RAMSIZ)
+   11                   ;
+   12                   ;       RESET
+   13 0000                         ORG      ROMTOP
+   14                   ;
+   15                   ;       START
+   16 0000 310090                  LD       SP,STACK
+   17 0003 213100                  LD       HL,MESSAGE
+   18 0006 7E           HLLOOP:    LD       A,(HL)
+   19 0007 FE00                    CP       00H
+   20 0009 2806                    JR       Z,EBLOOP
+   21 000B CD1900                  CALL     PUTCH
+   22 000E 23                      INC      HL
+   23 000F 18F5                    JR       HLLOOP
+   24                   ;
+   25 0011 CD2600       EBLOOP:    CALL     GETCH
+   26 0014 CD1900                  CALL     PUTCH
+   27 0017 18F8                    JR       EBLOOP
+   28                   ;
+   29 0019 F5           PUTCH:     PUSH     AF
+   30 001A 3A01E0       PCST1:     LD       A,(UARTCR)
+   31 001D CB4F                    BIT      1,A
+   32 001F 28F9                    JR       Z,PCST1
+   33 0021 F1                      POP      AF
+   34 0022 3200E0                  LD       (UARTDR),A
+   35 0025 C9                      RET
+   36                   ;
+   37 0026 3A01E0       GETCH:     LD       A,(UARTCR)
+   38 0029 CB47                    BIT      0,A
+   39 002B 28F9                    JR       Z,GETCH
+   40 002D 3A00E0                  LD       A,(UARTDR)
+   41 0030 C9                      RET
+   42                   ;
+   43 0031 48454C4C4F2C MESSAGE    DB       'HELLO, WORLD',0DH,0AH,0
+           20574F524C44 
+           0D0A00       
+   44                   ;
+   45 0000                         END      0000H

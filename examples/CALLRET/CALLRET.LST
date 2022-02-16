@@ -1,0 +1,21 @@
+    1                   ;       CALLRET - EMUZ80 RAM TEST
+    2                   ;       TARGET: EMUZ80
+    3                   ;       ASSEMBLER: ARCPIT XZ80.EXE
+    4                   ;
+    5 0000              ROMTOP     EQU      0000H
+    6 8000              RAMTOP     EQU      8000H
+    7 9000              STACK      EQU      9000H
+    8                   ;
+    9                   ;       RESET
+   10 0000                         ORG      ROMTOP
+   11                   ;
+   12                   ;       START
+   13 0000 310090                  LD       SP,STACK
+   14 0003 CD0B00       LOOP:      CALL     SUB1
+   15 0006 CD0C00                  CALL     SUB2
+   16 0009 18F8                    JR       LOOP
+   17                   ;
+   18 000B C9           SUB1:      RET
+   19 000C C9           SUB2:      RET
+   20                   ;
+   21 0000                         END      0000H

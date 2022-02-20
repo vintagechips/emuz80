@@ -4,7 +4,7 @@
 
   Target: EMUZ80 - The computer with only Z80 and PIC18F47Q43
   Compiler: MPLAB XC8 v2.36
-  
+  Written by Tetsuya Suzuki
 */
 
 // CONFIG1
@@ -99,7 +99,7 @@ void __interrupt(irq(default),base(8)) Default_ISR(){}
 
 // Called at Z80 MREQ falling edge (PIC18F47Q43 issues WAIT)
 void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
-   static  union {
+   static union {
         unsigned int mem; // 16 bits Address
         struct {
             unsigned char l; // Address low 8 bits

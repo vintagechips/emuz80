@@ -63,7 +63,7 @@
 #include <xc.h>
 #include <stdio.h>
 
-#define Z80_CLK 2500000UL // Z80 clock frequency
+#define Z80_CLK 2500000UL // Z80 clock frequency (max 16MHz)
 
 #define ROM_SIZE 0x2000 // ROM size 8K bytes
 #define RAM_SIZE 0x1000 // RAM size 4K bytes
@@ -189,7 +189,7 @@ void main(void) {
     // Z80 clock(RA3) by NCO FDC mode
     RA3PPS = 0x3f; // RA3 asign NCO1
     ANSELA3 = 0; // Disable analog function
-    TRISA3 = 0; // PWM output pin
+    TRISA3 = 0; // NCO output pin
     NCO1INCU = (unsigned char)((Z80_CLK*2/61/65536) & 0xff);
     NCO1INCH = (unsigned char)((Z80_CLK*2/61/256) & 0xff);
     NCO1INCL = (unsigned char)((Z80_CLK*2/61) & 0xff);

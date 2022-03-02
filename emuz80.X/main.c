@@ -63,9 +63,9 @@
 #include <xc.h>
 #include <stdio.h>
 
-#define Z80_CLK 2500000UL // Z80 clock frequency (max 16MHz)
+#define Z80_CLK 2500000UL // Z80 clock frequency(Max 16MHz)
 
-#define ROM_SIZE 0x2000 // ROM size 8K bytes
+#define ROM_SIZE 0x4000 // ROM size 16K bytes
 #define RAM_SIZE 0x1000 // RAM size 4K bytes
 #define RAM_TOP 0x8000 // RAM start address
 #define UART_DREG 0xE000 // UART data register address
@@ -75,6 +75,14 @@
 
 extern const unsigned char rom[]; // Equivalent to ROM, see end of this file
 unsigned char ram[RAM_SIZE]; // Equivalent to RAM
+static union {
+    unsigned int w; // 16 bits Address
+    struct {
+        unsigned char l; // Address low 8 bits
+        unsigned char h; // Address high 8 bits
+    };
+} address;
+    
 
 /*
 // UART3 Transmit
@@ -99,14 +107,6 @@ void __interrupt(irq(default),base(8)) Default_ISR(){}
 
 // Called at Z80 MREQ falling edge (PIC18F47Q43 issues WAIT)
 void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
-   static union {
-        unsigned int mem; // 16 bits Address
-        struct {
-            unsigned char l; // Address low 8 bits
-            unsigned char h; // Address high 8 bits
-        };
-    } address;
-    
     CLC1IF = 0; // Clear interrupt flag
     
     address.h = PORTD; // Read address high
@@ -114,21 +114,22 @@ void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
     
     if(!RA5) { // Z80 memory read cycle (RD active)
         db_setout(); // Set data bus as output
-        if(address.mem < ROM_SIZE){ // ROM area
-            LATC = rom[address.mem]; // Out ROM data
-        } else if((address.mem >= RAM_TOP) && (address.mem < (RAM_TOP + RAM_SIZE))){ // RAM area
-            LATC = ram[address.mem - RAM_TOP]; // RAM data
-        } else if(address.mem == UART_CREG){ // UART control register
+        if(address.w < ROM_SIZE){ // ROM area
+            LATC = rom[address.w]; // Out ROM data
+        } else if((address.w >= RAM_TOP) && (address.w < (RAM_TOP + RAM_SIZE))){ // RAM area
+            LATC = ram[address.w - RAM_TOP]; // RAM data
+        } else if(address.w == UART_CREG){ // UART control register
             LATC = PIR9; // U3 flag
-        } else if(address.mem == UART_DREG){ // UART data register
+        } else if(address.w == UART_DREG){ // UART data register
             LATC = U3RXB; // U3 RX buffer
         } else { // Out of memory
             LATC = 0xff; // Invalid data
         }
     } else { // Z80 memory write cycle (RD inactive)
-        if((address.mem >= RAM_TOP) && (address.mem < (RAM_TOP + RAM_SIZE))){ // RAM area
-            ram[address.mem - RAM_TOP] = PORTC; // Write into RAM
-        } else if(address.mem == UART_DREG) { // UART data register
+        if(RE0) while(RE0);
+        if((address.w >= RAM_TOP) && (address.w < (RAM_TOP + RAM_SIZE))){ // RAM area
+            ram[address.w - RAM_TOP] = PORTC; // Write into RAM
+        } else if(address.w == UART_DREG) { // UART data register
             U3TXB = PORTC; // Write into U3 TX buffer
         }
     }
@@ -189,7 +190,7 @@ void main(void) {
     // Z80 clock(RA3) by NCO FDC mode
     RA3PPS = 0x3f; // RA3 asign NCO1
     ANSELA3 = 0; // Disable analog function
-    TRISA3 = 0; // NCO output pin
+    TRISA3 = 0; // PWM output pin
     NCO1INCU = (unsigned char)((Z80_CLK*2/61/65536) & 0xff);
     NCO1INCH = (unsigned char)((Z80_CLK*2/61/256) & 0xff);
     NCO1INCL = (unsigned char)((Z80_CLK*2/61) & 0xff);

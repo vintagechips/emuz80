@@ -5,4 +5,4 @@ The required clock frequency for the Z80 is as follows<br>
 emuz80_pic.hex 2.5MHz<br>
 emuz80_pic_kuma.hex 2.5MHz<br>
 emuz80_pic_hlide.hex 4.6MHz<br>
-emuz80_pic_yyhayami.hex 4.6MHz
+emuz80_pic_yyhayami.hex 4.3MHz

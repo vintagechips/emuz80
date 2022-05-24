@@ -65,25 +65,30 @@
 
 #define Z80_CLK 2500000UL // Z80 clock frequency(Max 16MHz)
 
-#define ROM_SIZE 0x4000 // ROM size 16K bytes
-#define RAM_SIZE 0x1000 // RAM size 4K bytes
-#define RAM_TOP 0x8000 // RAM start address
-#define UART_DREG 0xE000 // UART data register address
-#define UART_CREG 0xE001 // UART control register address
+#define ROM_SIZE 0x4000 //16K bytes
+#define RAM_SIZE 0x1000 //4K bytes
+#define RAM_TOP 0x8000 //RAM top address
+#define RAM_END RAM_TOP+RAM_SIZE
+#define UART_DREG 0xE000 //Data REG
+#define UART_CREG 0xE001 //Control REG
 
 #define _XTAL_FREQ 64000000UL
 
-extern const unsigned char rom[]; // Equivalent to ROM, see end of this file
-unsigned char ram[RAM_SIZE]; // Equivalent to RAM
-static union {
-    unsigned int w; // 16 bits Address
-    struct {
-        unsigned char l; // Address low 8 bits
-        unsigned char h; // Address high 8 bits
-    };
-} address;
-    
+//Z80 ROM equivalent, see end of this file
+extern const unsigned char rom[];
 
+//Z80 RAM equivalent
+unsigned char ram[RAM_SIZE];
+
+//Address Bus
+union {
+    unsigned int w; //16 bits Address
+    struct {
+        unsigned char l; //Address low
+        unsigned char h; //Address high
+    };
+} ab;
+    
 /*
 // UART3 Transmit
 void putch(char c) {
@@ -98,48 +103,47 @@ char getch(void) {
 }
 */
 
-#define dff_reset() {G3POL = 1; G3POL = 0;}
-#define db_setin() (TRISC = 0xff)
-#define db_setout() (TRISC = 0x00)
-
 // Never called, logically
 void __interrupt(irq(default),base(8)) Default_ISR(){}
 
-// Called at Z80 MREQ falling edge (PIC18F47Q43 issues WAIT)
+// Called at WAIT falling edge(Immediately after Z80 MREQ falling)
 void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
     CLC1IF = 0; // Clear interrupt flag
     
-    address.h = PORTD; // Read address high
-    address.l = PORTB; // Read address low
+    ab.h = PORTD; // Read address high
+    ab.l = PORTB; // Read address low
     
-    if(!RA5) { // Z80 memory read cycle (RD active)
-        db_setout(); // Set data bus as output
-        if(address.w < ROM_SIZE){ // ROM area
-            LATC = rom[address.w]; // Out ROM data
-        } else if((address.w >= RAM_TOP) && (address.w < (RAM_TOP + RAM_SIZE))){ // RAM area
-            LATC = ram[address.w - RAM_TOP]; // RAM data
-        } else if(address.w == UART_CREG){ // UART control register
-            LATC = PIR9; // U3 flag
-        } else if(address.w == UART_DREG){ // UART data register
-            LATC = U3RXB; // U3 RX buffer
-        } else { // Out of memory
-            LATC = 0xff; // Invalid data
-        }
-    } else { // Z80 memory write cycle (RD inactive)
-        if(RE0) while(RE0);
-        if((address.w >= RAM_TOP) && (address.w < (RAM_TOP + RAM_SIZE))){ // RAM area
-            ram[address.w - RAM_TOP] = PORTC; // Write into RAM
-        } else if(address.w == UART_DREG) { // UART data register
-            U3TXB = PORTC; // Write into U3 TX buffer
-        }
-    }
-    dff_reset(); // WAIT inactive
-}
+  //Z80 memory write cycle
+  if(RA5) {
+    if((ab.w >= RAM_TOP) && (ab.w < RAM_END)) // RAM area
+      ram[ab.w - RAM_TOP] = PORTC; // Write into RAM
+    else if(ab.w == UART_DREG) // U3TXB
+      U3TXB = PORTC; // Write into  U3TXB
+    //Release wait (D-FF reset)
+    G3POL = 1;
+    G3POL = 0;
+    return;
+  }
 
-//  Called at Z80 MREQ rising edge
-void __interrupt(irq(INT0),base(8)) INT0_ISR(){
-    INT0IF = 0; // Clear interrupt flag
-    db_setin(); // Set data bus as input
+  //Z80 memory read cycle
+  TRISC = 0x00; // Set data bus as output
+  if(ab.w < ROM_SIZE) // ROM area
+    LATC = rom[ab.w]; // Out ROM data
+  else if((ab.w >= RAM_TOP) && (ab.w < RAM_END)) // RAM area
+    LATC = ram[ab.w - RAM_TOP]; // Out RAM data
+  else if(ab.w == UART_CREG) // PIR9
+    LATC = PIR9; // Out PIR9
+  else if(ab.w == UART_DREG) //U3RXB
+    LATC = U3RXB; // Out U3RXB
+  else //Empty
+    LATC = 0xff; //Invalid data
+  //Release wait (D-FF reset)
+  G3POL = 1;
+  G3POL = 0;
+
+  //Post processing
+  while(!RA1){};
+  TRISC = 0xff; //DATA-BUS -> Z80
 }
 
 // main routine
@@ -190,10 +194,8 @@ void main(void) {
     // Z80 clock(RA3) by NCO FDC mode
     RA3PPS = 0x3f; // RA3 asign NCO1
     ANSELA3 = 0; // Disable analog function
-    TRISA3 = 0; // PWM output pin
-    NCO1INCU = (unsigned char)((Z80_CLK*2/61/65536) & 0xff);
-    NCO1INCH = (unsigned char)((Z80_CLK*2/61/256) & 0xff);
-    NCO1INCL = (unsigned char)((Z80_CLK*2/61) & 0xff);
+    TRISA3 = 0; // NCO output pin
+    NCO1INC = Z80_CLK * 2 / 61;
     NCO1CLK = 0x00; // Clock source Fosc
     NCO1PFM = 0;  // FDC mode
     NCO1OUT = 1;  // NCO output enable
@@ -240,7 +242,7 @@ void main(void) {
     CLCnPOL = 0x82; // LCG2POL inverted, LCPOL inverted
 
     // CLC data inputs select
-    CLCnSEL0 = 0; // D-FF CLK assign CLCIN0PPS(RA0)
+    CLCnSEL0 = 0; // D-FF CLK assign CLCIN0PPS(RA1)
     CLCnSEL1 = 1; // D-FF D assign CLCIN1PPS(RA2) 
     CLCnSEL2 = 127; // D-FF S assign none
     CLCnSEL3 = 127; // D-FF R assign none
@@ -254,29 +256,22 @@ void main(void) {
     CLCDATA = 0x0; // Clear all CLC outs
     CLCnCON = 0x8c; // Select D-FF, falling edge inturrupt
 
-    // Vectored Interrupt Controller setting sequence
-    INTCON0bits.IPEN = 1; // Interrupt priority enable
-
+    // Unlock IVT
     IVTLOCK = 0x55;
     IVTLOCK = 0xAA;
-    IVTLOCKbits.IVTLOCKED = 0x00; // Unlock IVT
+    IVTLOCKbits.IVTLOCKED = 0x00;
 
-    IVTBASEU = 0;
-    IVTBASEH = 0;
-    IVTBASEL = 8; // Default VIT base address
+    // Default IVT base address
+    IVTBASE = 0x000008;
 
+    // Lock IVT
     IVTLOCK = 0x55;
     IVTLOCK = 0xAA;
-    IVTLOCKbits.IVTLOCKED = 0x01; // Lock IVT
+    IVTLOCKbits.IVTLOCKED = 0x01;
 
     // CLC VI enable
     CLC1IF = 0; // Clear the CLC interrupt flag
     CLC1IE = 1; // Enabling CLC1 interrupt
-
-    // INT0 VI enable
-    INT0PPS = 0x1; //RA1->INTERRUPT MANAGER:INT0;
-    INT0EDG = 1; // Rising edge
-    INT0IE = 1;
 
     // Z80 start
     GIE = 1; // Global interrupt enable
@@ -286,6 +281,17 @@ void main(void) {
 }
 
 const unsigned char rom[ROM_SIZE] = {
+/*
+    // HELLO
+	0x31, 0x00, 0x90, 0x21, 0x31, 0x00, 0x7e, 0xfe,
+	0x00, 0x28, 0x06, 0xcd, 0x19, 0x00, 0x23, 0x18,
+	0xf5, 0xcd, 0x26, 0x00, 0xcd, 0x19, 0x00, 0x18,
+	0xf8, 0xf5, 0x3a, 0x01, 0xe0, 0xcb, 0x4f, 0x28,
+	0xf9, 0xf1, 0x32, 0x00, 0xe0, 0xc9, 0x3a, 0x01,
+	0xe0, 0xcb, 0x47, 0x28, 0xf9, 0x3a, 0x00, 0xe0,
+	0xc9, 0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x2c, 0x20,
+	0x57, 0x4f, 0x52, 0x4c, 0x44, 0x0d, 0x0a, 0x00,
+*/
     // EMUBASIC
 	0xf3, 0x31, 0xed, 0x80, 0xc3, 0x41, 0x00, 0xff,
 	0xc3, 0x34, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff,

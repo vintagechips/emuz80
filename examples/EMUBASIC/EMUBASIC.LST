@@ -13,8 +13,8 @@
    13 80ED              TSTACK     EQU      80EDH
    14                   ;
    15                   ;       UART REGISTER ADDRESS
-   16 E000              UARTDR     EQU      0E000H      ; UART CONTROL REGISTOR
-   17 E001              UARTCR     EQU      0E001H      ; UART DATA REGISTOR
+   16 E000              UARTDR     EQU      0E000H      ; UART DATA REGISTOR
+   17 E001              UARTCR     EQU      0E001H      ; UART CONTROL REGISTOR
    18                   ;
    19                   ;       RESET (RST 00H)
    20 0000                         ORG      ROMTOP

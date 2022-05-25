@@ -142,7 +142,7 @@ void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
   G3POL = 0;
 
   //Post processing
-  while(!RA1){};
+  while(!RA1);
   TRISC = 0xff; //Set as input
 }
 

@@ -143,7 +143,7 @@ void __interrupt(irq(CLC1),base(8)) CLC_ISR(){
 
   //Post processing
   while(!RA1){};
-  TRISC = 0xff; //DATA-BUS -> Z80
+  TRISC = 0xff; //Set as input
 }
 
 // main routine

@@ -6,4 +6,4 @@ emuz80_pic.hex 2.5MHz<br>
 emuz80_pic_kuma.hex 2.5MHz<br>
 emuz80_pic_hlide.hex 4.6MHz<br>
 emuz80_pic_yyhayami.hex 4.3MHz<br>
-emuz80_pic_gazelle.hex 6MHz PIC18F47Q43 must be replaced with PIC18F47Q84
+emuz80_pic_gazelle.hex 6MHz PIC must be replaced with PIC18F47Q84
